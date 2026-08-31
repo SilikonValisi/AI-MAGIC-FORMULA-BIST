@@ -1,0 +1,930 @@
+<title>BIST Magic Formula</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,500&family=Public+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- tokens ---------- */
+  :root {
+    --bg: #EEF0EE;
+    --surface: #FFFFFF;
+    --surface-alt: #F5F6F4;
+    --ink: #141C22;
+    --ink-muted: #57646B;
+    --ink-faint: #8B969B;
+    --line: #D8DBD8;
+    --line-strong: #C3C8C3;
+    --accent: #A9791E;
+    --accent-soft: #EFE3C7;
+    --focus: #2E6E62;
+
+    --chip-text-dark: #1B120E;
+    --chip-text-light: #FFFFFF;
+
+    --warn: #B23B22;
+
+    --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "Spline Sans Mono", "SFMono-Regular", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10171A;
+      --surface: #182023;
+      --surface-alt: #1F282B;
+      --ink: #E9E6DE;
+      --ink-muted: #9DA9A6;
+      --ink-faint: #66716F;
+      --line: #2C3739;
+      --line-strong: #3B4749;
+      --accent: #DCAC4E;
+      --accent-soft: #3B3320;
+      --focus: #5EA695;
+      --chip-text-dark: #16100C;
+      --chip-text-light: #FFFDF9;
+      --warn: #E27F5D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10171A;
+    --surface: #182023;
+    --surface-alt: #1F282B;
+    --ink: #E9E6DE;
+    --ink-muted: #9DA9A6;
+    --ink-faint: #66716F;
+    --line: #2C3739;
+    --line-strong: #3B4749;
+    --accent: #DCAC4E;
+    --accent-soft: #3B3320;
+    --focus: #5EA695;
+    --chip-text-dark: #16100C;
+    --chip-text-light: #FFFDF9;
+    --warn: #E27F5D;
+  }
+
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(28px, 4vw, 56px) clamp(18px, 4vw, 36px) 64px;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 22px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.7rem, 1.25rem + 1.6vw, 2.5rem);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h1 em {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--ink-muted);
+  }
+  .dek {
+    max-width: 62ch;
+    color: var(--ink-muted);
+    font-size: 0.98rem;
+  }
+  .dek strong { color: var(--ink); font-weight: 600; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 0.74rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- upload ---------- */
+  .upload-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .upload-bar.dragover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .upload-bar.error { border-color: var(--warn); }
+  .upload-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 220px; }
+  .upload-title { font-size: 0.85rem; font-weight: 600; }
+  .upload-status { font-size: 0.78rem; color: var(--ink-muted); }
+  .upload-status.error { color: var(--warn); }
+  .upload-actions { display: flex; align-items: center; gap: 12px; }
+  .upload-btn {
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-alt);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .upload-btn:hover { border-color: var(--accent); }
+  .upload-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .reset-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .reset-link:hover { color: var(--ink-muted); }
+  #csvFileInput { display: none; }
+
+  /* ---------- controls + legend ---------- */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 14px;
+  }
+
+  .search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .search-field label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .search-field input {
+    width: 240px;
+    max-width: 60vw;
+    padding: 8px 12px;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    outline-offset: 2px;
+  }
+  .search-field input:focus-visible { outline: 2px solid var(--focus); }
+  .search-field input::placeholder { color: var(--ink-faint); }
+
+  .legends {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+  }
+  .legend-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .legend-bar {
+    width: 190px;
+    height: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+  }
+  .legend-bar.fin {
+    background: linear-gradient(
+      to right,
+      #FBEAE6 0%, #EFAF97 23%, #DE7A54 47%, #BF4A2A 61%, #A83420 79%, #7E2115 100%
+    );
+  }
+  :root:not([data-theme="light"]) .legend-bar.fin,
+  [data-theme="dark"] .legend-bar.fin {
+    background: linear-gradient(
+      to right,
+      #3A231F 0%, #6E3226 23%, #A8452B 47%, #CE6238 61%, #E27B48 79%, #F4A578 100%
+    );
+  }
+  .legend-bar.debt {
+    background: linear-gradient(
+      to right,
+      #1E4A45 0%, #4F8A81 25%, #C7C9C2 50%, #DE7A54 75%, #7E2115 100%
+    );
+  }
+  :root:not([data-theme="light"]) .legend-bar.debt,
+  [data-theme="dark"] .legend-bar.debt {
+    background: linear-gradient(
+      to right,
+      #4FA89C 0%, #2E6B63 25%, #4A524E 50%, #A8452B 75%, #F4A578 100%
+    );
+  }
+  .legend-ticks {
+    display: flex;
+    justify-content: space-between;
+    width: 190px;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- table ---------- */
+  .table-shell {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: auto;
+    max-height: 74vh;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 880px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
+    text-align: right;
+    padding: 12px 14px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { color: var(--ink-muted); }
+  thead th.col-name, thead th.col-rank { text-align: left; }
+  thead th .arrow {
+    display: inline-block;
+    margin-left: 4px;
+    color: var(--accent);
+    opacity: 0;
+    transform: translateY(1px);
+  }
+  thead th[data-active="true"] { color: var(--ink); }
+  thead th[data-active="true"] .arrow { opacity: 1; }
+
+  tbody td {
+    padding: 10px 14px;
+    text-align: right;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr:nth-child(even) { background: var(--surface-alt); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+
+  td.col-rank {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    width: 34px;
+  }
+
+  td.col-name { text-align: left; }
+  .ticker {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+  }
+  .company {
+    display: block;
+    font-size: 0.76rem;
+    color: var(--ink-muted);
+    font-weight: 400;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+
+  td.col-period {
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .num-cell {
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+  }
+  .rank-badge {
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    color: var(--ink-faint);
+    margin-left: 5px;
+  }
+  .neg { color: var(--warn); }
+
+  .ratio-chip {
+    display: inline-block;
+    min-width: 58px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    font-weight: 500;
+    text-align: right;
+  }
+  .fin-na {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+  }
+  .ratio-dash { color: var(--ink-faint); }
+
+  .score-cell { font-weight: 600; font-size: 0.92rem; }
+
+  .liquidity-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .liquidity-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--warn);
+    flex: none;
+  }
+
+  tbody td.empty-state {
+    text-align: center;
+    padding: 40px 12px;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+
+  /* ---------- footer ---------- */
+  .foot {
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--ink-muted);
+    font-size: 0.82rem;
+    max-width: 78ch;
+  }
+  .foot code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    background: var(--surface-alt);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Greenblatt Screen &middot; Borsa Istanbul</div>
+    <h1>BIST Magic Formula <em>&amp; financing load</em></h1>
+    <p class="dek">
+      Ranked by combined Earnings-Yield and Return-on-Capital rank. Two supplementary
+      leverage lenses sit alongside it: <strong>Financing / EBIT</strong> shows how much of
+      each company's trailing EBIT gets consumed by interest and FX cost on debt, and
+      <strong>Debt / Capital</strong> shows how much of a good RoC rank is leverage rather
+      than genuine capital efficiency &mdash; neither is part of the formula itself, both are
+      here so a cheap-looking rank can be checked against how it got there.
+    </p>
+    <div class="meta-row" id="metaRow"></div>
+  </header>
+
+  <div class="upload-bar" id="uploadBar">
+    <div class="upload-copy">
+      <span class="upload-title">Refresh with this month's CSV</span>
+      <span class="upload-status" id="uploadStatus">Showing sample data &mdash; drag your <code>magic_formula_all_*.csv</code> here, or click Choose file.</span>
+    </div>
+    <div class="upload-actions">
+      <button type="button" class="reset-link" id="resetLink" hidden>Reset to sample</button>
+      <button type="button" class="upload-btn" id="chooseFileBtn">Choose file</button>
+      <input type="file" id="csvFileInput" accept=".csv,text/csv" />
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label for="searchInput">Filter by ticker or name</label>
+      <input id="searchInput" type="text" placeholder="e.g. TTKOM, Tüpraş&hellip;" autocomplete="off" />
+    </div>
+    <div class="legends">
+      <div class="legend">
+        <div class="legend-label">Financing / EBIT</div>
+        <div class="legend-bar fin" aria-hidden="true"></div>
+        <div class="legend-ticks"><span>0%</span><span>35</span><span>70</span><span>105</span><span>&ge;150%</span></div>
+      </div>
+      <div class="legend">
+        <div class="legend-label">Debt share of capital</div>
+        <div class="legend-bar debt" aria-hidden="true"></div>
+        <div class="legend-ticks"><span>&le;&minus;100%</span><span>&minus;50</span><span>0</span><span>50</span><span>&ge;100%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-shell">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th class="col-rank" data-key="rank" data-type="num" data-dir="asc">#</th>
+          <th class="col-name" data-key="ticker" data-type="text" data-dir="asc">Ticker &amp; Company</th>
+          <th class="col-period" data-key="period" data-type="text" data-dir="asc">Period</th>
+          <th data-key="ey" data-type="num" data-dir="desc">Earnings Yield</th>
+          <th data-key="roc" data-type="num" data-dir="desc">Return on Capital</th>
+          <th data-key="finRatio" data-type="num" data-dir="desc">Financing / EBIT</th>
+          <th data-key="debtShare" data-type="num" data-dir="desc">Debt / Capital</th>
+          <th data-key="score" data-type="num" data-dir="asc">Magic Score</th>
+          <th data-key="volume" data-type="num" data-dir="desc">Volume mn$</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    <p id="sourceLine">
+      Source: <code>magic_formula_all_20260831.csv</code> (Midas TTM financials, isyatirim
+      metadata) &middot; 101 names &middot; market cap &ge; 25bn TL, capital-employed sign
+      guard applied.
+    </p>
+    <p>
+      Financing / EBIT is now a true trailing-twelve-month figure on both sides (fixed an
+      earlier version that compared a YTD financing-expense number against a full-year EBIT).
+      Rows with negative EBIT show <span class="fin-na">EBIT&nbsp;neg.</span> instead of a
+      ratio, since dividing by a loss doesn't describe leverage risk the same way.
+    </p>
+    <p>
+      <strong>Debt / Capital</strong> is a second, different leverage lens: it's the share of
+      each company's capital employed (the same base RoC is computed against) that's funded by
+      net debt rather than equity. A high value here means a good RoC rank is substantially
+      leverage-driven, not pure capital efficiency &mdash; negative values mean the company is
+      sitting on net cash. Unlike Financing / EBIT, this one stays meaningful even when EBIT is
+      currently negative. The
+      <span class="liquidity-flag"><span class="liquidity-dot"></span> dot</span> on Volume
+      flags average daily trading under 5&nbsp;mn$.
+    </p>
+  </div>
+
+</div>
+
+<script>
+  const DEFAULT_SOURCE = { filename: "magic_formula_all_20260831.csv", loadedAt: null, isSample: true };
+  const DEFAULT_DATA = [{"rank":1,"ticker":"ARASE","name":"Doğu Aras Enerji","period":"2026/6","group":"June","ey":27.95,"roc":35.72,"eyRank":3,"rocRank":4,"score":7.0,"finRatio":14.9,"debtShare":3.9,"volume":1.0},{"rank":2,"ticker":"MAVI","name":"Mavi Giyim Sanayi Tic.A.S","period":"2026/3","group":"March","ey":20.4,"roc":33.59,"eyRank":5,"rocRank":7,"score":12.0,"finRatio":56.4,"debtShare":-24.5,"volume":4.1},{"rank":3,"ticker":"ENJSA","name":"Enerjisa Enerji","period":"2026/6","group":"June","ey":17.84,"roc":34.44,"eyRank":8,"rocRank":5,"score":13.0,"finRatio":75.8,"debtShare":73.5,"volume":6.6},{"rank":4,"ticker":"ATATP","name":"ATP Bilgisayar","period":"2026/6","group":"June","ey":12.78,"roc":46.61,"eyRank":16,"rocRank":2,"score":18.0,"finRatio":1.6,"debtShare":-4.9,"volume":8.5},{"rank":5,"ticker":"TTKOM","name":"Türk Telekom","period":"2026/6","group":"June","ey":16.25,"roc":24.18,"eyRank":11,"rocRank":14,"score":25.0,"finRatio":95.1,"debtShare":58.8,"volume":45.8},{"rank":6,"ticker":"CLEBI","name":"Çelebi","period":"2026/6","group":"June","ey":11.57,"roc":34.24,"eyRank":19,"rocRank":6,"score":25.0,"finRatio":21.5,"debtShare":45.2,"volume":1.0},{"rank":7,"ticker":"GRSEL","name":"Gürsel Taşımacılık","period":"2026/6","group":"June","ey":12.87,"roc":27.88,"eyRank":15,"rocRank":11,"score":26.0,"finRatio":5.4,"debtShare":-11.1,"volume":3.4},{"rank":8,"ticker":"CCOLA","name":"Coca-Cola İçecek A.Ş","period":"2026/6","group":"June","ey":12.57,"roc":30.37,"eyRank":17,"rocRank":10,"score":27.0,"finRatio":37.6,"debtShare":29.3,"volume":11.4},{"rank":9,"ticker":"YEOTK","name":"YEO Teknoloji","period":"2026/6","group":"June","ey":11.19,"roc":33.44,"eyRank":21,"rocRank":8,"score":29.0,"finRatio":64.4,"debtShare":53.4,"volume":18.5},{"rank":10,"ticker":"TAVHL","name":"TAV Holding","period":"2026/6","group":"June","ey":18.29,"roc":18.51,"eyRank":6,"rocRank":23,"score":29.0,"finRatio":61.3,"debtShare":0.0,"volume":21.4},{"rank":11,"ticker":"AKFIS","name":"Akfen İnşaat","period":"2026/6","group":"June","ey":14.16,"roc":21.36,"eyRank":13,"rocRank":16,"score":29.0,"finRatio":31.6,"debtShare":34.0,"volume":6.7},{"rank":12,"ticker":"ARDYZ","name":"ARD Grup Bilişim","period":"2026/6","group":"June","ey":8.82,"roc":229.73,"eyRank":30,"rocRank":1,"score":31.0,"finRatio":36.3,"debtShare":133.9,"volume":8.1},{"rank":13,"ticker":"AEFES","name":"Anadolu Efes","period":"2026/6","group":"June","ey":17.47,"roc":15.62,"eyRank":9,"rocRank":27,"score":36.0,"finRatio":76.1,"debtShare":33.9,"volume":18.3},{"rank":14,"ticker":"INVES","name":"Investco Holding","period":"2026/6","group":"June","ey":9.02,"roc":30.77,"eyRank":28,"rocRank":9,"score":37.0,"finRatio":0.5,"debtShare":-10.8,"volume":1.7},{"rank":15,"ticker":"TRENJ","name":"TR Doğal Enerji Kaynakları","period":"2026/6","group":"June","ey":107.85,"roc":12.12,"eyRank":1,"rocRank":36,"score":37.0,"finRatio":0.8,"debtShare":-35.3,"volume":4.2},{"rank":16,"ticker":"MPARK","name":"MLP Sağlık Hizmetleri","period":"2026/6","group":"June","ey":10.4,"roc":21.13,"eyRank":23,"rocRank":17,"score":40.0,"finRatio":55.5,"debtShare":28.2,"volume":6.7},{"rank":17,"ticker":"TBORG","name":"Tuborg","period":"2026/6","group":"June","ey":12.44,"roc":18.86,"eyRank":18,"rocRank":22,"score":40.0,"finRatio":52.6,"debtShare":-4.9,"volume":0.6},{"rank":18,"ticker":"TUPRS","name":"Tüpraş","period":"2026/6","group":"June","ey":12.91,"roc":15.76,"eyRank":14,"rocRank":26,"score":40.0,"finRatio":29.5,"debtShare":-25.0,"volume":164.2},{"rank":19,"ticker":"TRMET","name":"TR Anadolu Metal","period":"2026/6","group":"June","ey":21.39,"roc":12.01,"eyRank":4,"rocRank":37,"score":41.0,"finRatio":null,"debtShare":-36.4,"volume":15.9},{"rank":20,"ticker":"TCELL","name":"Turkcell","period":"2026/6","group":"June","ey":15.71,"roc":14.05,"eyRank":12,"rocRank":30,"score":42.0,"finRatio":71.8,"debtShare":27.0,"volume":54.9},{"rank":21,"ticker":"ULKER","name":"Ülker Bisküvi","period":"2026/6","group":"June","ey":16.45,"roc":12.35,"eyRank":10,"rocRank":35,"score":45.0,"finRatio":126.9,"debtShare":41.9,"volume":13.5},{"rank":22,"ticker":"DOHOL","name":"Doğan Holding","period":"2026/6","group":"June","ey":73.82,"roc":10.6,"eyRank":2,"rocRank":43,"score":45.0,"finRatio":88.2,"debtShare":-41.7,"volume":5.0},{"rank":23,"ticker":"GUBRF","name":"Gübre Fabrikaları","period":"2026/3","group":"March","ey":7.25,"roc":27.57,"eyRank":34,"rocRank":12,"score":46.0,"finRatio":20.0,"debtShare":-11.0,"volume":28.5},{"rank":24,"ticker":"SARKY","name":"Sarkuysan","period":"2026/6","group":"June","ey":9.11,"roc":17.54,"eyRank":27,"rocRank":24,"score":51.0,"finRatio":65.2,"debtShare":49.3,"volume":4.6},{"rank":25,"ticker":"OYAKC","name":"Oyak Çimento","period":"2026/6","group":"June","ey":10.14,"roc":14.6,"eyRank":24,"rocRank":29,"score":53.0,"finRatio":16.7,"debtShare":-15.5,"volume":9.0},{"rank":26,"ticker":"PAHOL","name":"Pasifik Holding","period":"2026/6","group":"June","ey":18.16,"roc":9.58,"eyRank":7,"rocRank":47,"score":54.0,"finRatio":6.0,"debtShare":-0.0,"volume":8.2},{"rank":27,"ticker":"GENIL","name":"Gen İlaç","period":"2026/6","group":"June","ey":4.74,"roc":22.0,"eyRank":50,"rocRank":15,"score":65.0,"finRatio":48.7,"debtShare":41.2,"volume":10.2},{"rank":28,"ticker":"GESAN","name":"Girişim Elektrik","period":"2026/6","group":"June","ey":7.44,"roc":12.55,"eyRank":33,"rocRank":34,"score":67.0,"finRatio":16.0,"debtShare":16.5,"volume":27.2},{"rank":29,"ticker":"GLRMK","name":"Gülermak Ağır Sanayi","period":"2026/6","group":"June","ey":9.6,"roc":10.95,"eyRank":25,"rocRank":42,"score":67.0,"finRatio":30.4,"debtShare":-0.8,"volume":15.2},{"rank":30,"ticker":"BRYAT","name":"Borusan Yatırım","period":"2026/6","group":"June","ey":8.85,"roc":11.99,"eyRank":29,"rocRank":38,"score":67.0,"finRatio":null,"debtShare":-2.1,"volume":2.7},{"rank":31,"ticker":"GLYHO","name":"Global Yatırım Holding","period":"2026/6","group":"June","ey":6.81,"roc":13.78,"eyRank":37,"rocRank":31,"score":68.0,"finRatio":60.0,"debtShare":135.7,"volume":1.5},{"rank":32,"ticker":"EUPWR","name":"Europower Enerji","period":"2026/6","group":"June","ey":4.42,"roc":19.14,"eyRank":51,"rocRank":21,"score":72.0,"finRatio":6.4,"debtShare":17.4,"volume":56.3},{"rank":33,"ticker":"DOAS","name":"Doğuş Otomotiv","period":"2026/6","group":"June","ey":11.19,"roc":8.41,"eyRank":20,"rocRank":53,"score":73.0,"finRatio":123.4,"debtShare":35.4,"volume":5.0},{"rank":34,"ticker":"ASTOR","name":"Astor Enerji","period":"2026/6","group":"June","ey":3.38,"roc":25.07,"eyRank":60,"rocRank":13,"score":73.0,"finRatio":13.3,"debtShare":-21.3,"volume":216.1},{"rank":35,"ticker":"ARMGD","name":"Armada Gıda","period":"2026/6","group":"June","ey":3.71,"roc":19.49,"eyRank":57,"rocRank":18,"score":75.0,"finRatio":55.6,"debtShare":49.7,"volume":5.0},{"rank":36,"ticker":"AHGAZ","name":"Ahlatçı Doğalgaz","period":"2026/6","group":"June","ey":7.67,"roc":10.5,"eyRank":32,"rocRank":44,"score":76.0,"finRatio":10.4,"debtShare":54.8,"volume":3.6},{"rank":37,"ticker":"HEDEF","name":"Hedef Holding","period":"2026/6","group":"June","ey":1.14,"roc":36.62,"eyRank":73,"rocRank":3,"score":76.0,"finRatio":2.3,"debtShare":12.4,"volume":12.1},{"rank":38,"ticker":"CWENE","name":"Cw Enerji","period":"2026/6","group":"June","ey":5.72,"roc":12.68,"eyRank":44,"rocRank":33,"score":77.0,"finRatio":88.2,"debtShare":41.4,"volume":58.5},{"rank":39,"ticker":"AKSA","name":"Aksa","period":"2026/6","group":"June","ey":7.07,"roc":11.09,"eyRank":36,"rocRank":41,"score":77.0,"finRatio":127.2,"debtShare":55.4,"volume":6.2},{"rank":40,"ticker":"SELEC","name":"Selçuk Ecza Deposu","period":"2026/6","group":"June","ey":3.6,"roc":19.25,"eyRank":59,"rocRank":20,"score":79.0,"finRatio":11.0,"debtShare":-20.7,"volume":20.6},{"rank":41,"ticker":"FROTO","name":"Ford Otosan","period":"2026/6","group":"June","ey":7.13,"roc":10.29,"eyRank":35,"rocRank":46,"score":81.0,"finRatio":138.4,"debtShare":41.9,"volume":41.3},{"rank":42,"ticker":"TRALT","name":"Türk Altın","period":"2026/6","group":"June","ey":5.01,"roc":13.14,"eyRank":49,"rocRank":32,"score":81.0,"finRatio":null,"debtShare":-38.2,"volume":133.8},{"rank":43,"ticker":"EFOR","name":"Efor Yat. San.","period":"2026/6","group":"June","ey":2.73,"roc":19.42,"eyRank":63,"rocRank":19,"score":82.0,"finRatio":96.4,"debtShare":47.2,"volume":32.2},{"rank":44,"ticker":"AGHOL","name":"Anadolu Grubu Holding","period":"2026/6","group":"June","ey":10.7,"roc":5.88,"eyRank":22,"rocRank":63,"score":85.0,"finRatio":227.0,"debtShare":30.8,"volume":3.2},{"rank":45,"ticker":"RYSAS","name":"Reysaş Taşımacılık","period":"2026/6","group":"June","ey":6.78,"roc":8.78,"eyRank":38,"rocRank":50,"score":88.0,"finRatio":69.8,"debtShare":9.0,"volume":5.5},{"rank":46,"ticker":"TABGD","name":"Tab Gıda","period":"2026/6","group":"June","ey":5.14,"roc":10.29,"eyRank":47,"rocRank":45,"score":92.0,"finRatio":55.7,"debtShare":5.6,"volume":5.3},{"rank":47,"ticker":"ASELS","name":"Aselsan","period":"2026/6","group":"June","ey":2.66,"roc":14.86,"eyRank":64,"rocRank":28,"score":92.0,"finRatio":19.9,"debtShare":10.3,"volume":279.8},{"rank":48,"ticker":"ENKAI","name":"Enka İnşaat","period":"2026/6","group":"June","ey":7.83,"roc":6.06,"eyRank":31,"rocRank":61,"score":92.0,"finRatio":8.7,"debtShare":-37.7,"volume":24.5},{"rank":49,"ticker":"CIMSA","name":"Çimsa","period":"2026/6","group":"June","ey":6.29,"roc":8.44,"eyRank":41,"rocRank":51,"score":92.0,"finRatio":44.4,"debtShare":50.8,"volume":7.6},{"rank":50,"ticker":"AKSEN","name":"Aksa Enerji","period":"2026/6","group":"June","ey":5.99,"roc":8.32,"eyRank":42,"rocRank":54,"score":96.0,"finRatio":31.3,"debtShare":51.7,"volume":18.9},{"rank":51,"ticker":"KCAER","name":"Kocaer Çelik Sanayi","period":"2026/6","group":"June","ey":5.08,"roc":9.58,"eyRank":48,"rocRank":48,"score":96.0,"finRatio":95.8,"debtShare":13.7,"volume":5.7},{"rank":52,"ticker":"ALKLC","name":"Altınkılıç Gıda","period":"2026/6","group":"June","ey":1.21,"roc":16.54,"eyRank":72,"rocRank":25,"score":97.0,"finRatio":196.6,"debtShare":81.0,"volume":11.0},{"rank":53,"ticker":"KRDMD","name":"Kardemir (D)","period":"2026/6","group":"June","ey":9.3,"roc":2.87,"eyRank":26,"rocRank":71,"score":97.0,"finRatio":86.8,"debtShare":0.2,"volume":52.1},{"rank":54,"ticker":"NUHCM","name":"Nuh Çimento","period":"2026/6","group":"June","ey":6.43,"roc":6.98,"eyRank":39,"rocRank":59,"score":98.0,"finRatio":20.2,"debtShare":-18.7,"volume":0.3},{"rank":55,"ticker":"BRSAN","name":"Borusan Birleşik Boru Fab.","period":"2026/6","group":"June","ey":4.08,"roc":9.22,"eyRank":52,"rocRank":49,"score":101.0,"finRatio":25.0,"debtShare":15.0,"volume":32.6},{"rank":56,"ticker":"ENERY","name":"Enerya Enerji","period":"2026/6","group":"June","ey":6.42,"roc":5.35,"eyRank":40,"rocRank":64,"score":104.0,"finRatio":12.3,"debtShare":-4.9,"volume":11.8},{"rank":57,"ticker":"LYDHO","name":"Lydia Holding","period":"2026/6","group":"June","ey":2.08,"roc":11.78,"eyRank":67,"rocRank":39,"score":106.0,"finRatio":1.1,"debtShare":-13.1,"volume":1.5},{"rank":58,"ticker":"KCHOL","name":"Koç Holding","period":"2026/6","group":"June","ey":3.98,"roc":7.69,"eyRank":53,"rocRank":55,"score":108.0,"finRatio":58.7,"debtShare":165.3,"volume":96.7},{"rank":59,"ticker":"BIMAS","name":"Bim Birleşik Mağazalar A.Ş","period":"2026/6","group":"June","ey":3.97,"roc":7.42,"eyRank":54,"rocRank":56,"score":110.0,"finRatio":42.5,"debtShare":11.5,"volume":85.6},{"rank":60,"ticker":"CEMZY","name":"Cem Zeytin","period":"2026/6","group":"June","ey":1.43,"roc":11.2,"eyRank":71,"rocRank":40,"score":111.0,"finRatio":58.6,"debtShare":-0.8,"volume":10.6},{"rank":61,"ticker":"THYAO","name":"Türk Hava Yolları","period":"2026/6","group":"June","ey":5.82,"roc":3.39,"eyRank":43,"rocRank":69,"score":112.0,"finRatio":63.0,"debtShare":34.7,"volume":327.8},{"rank":62,"ticker":"TOASO","name":"Tofaş Fabrika","period":"2026/6","group":"June","ey":3.77,"roc":7.31,"eyRank":55,"rocRank":58,"score":113.0,"finRatio":45.2,"debtShare":58.6,"volume":23.3},{"rank":63,"ticker":"ISDMR","name":"İskenderun Demir Çelik","period":"2026/6","group":"June","ey":5.32,"roc":4.4,"eyRank":46,"rocRank":67,"score":113.0,"finRatio":34.0,"debtShare":-1.5,"volume":2.8},{"rank":64,"ticker":"SAHOL","name":"Sabancı Holding","period":"2026/6","group":"June","ey":2.98,"roc":8.44,"eyRank":62,"rocRank":52,"score":114.0,"finRatio":20.8,"debtShare":266.3,"volume":65.2},{"rank":65,"ticker":"AKFYE","name":"Akfen Yenilenebilir Enerji","period":"2026/6","group":"June","ey":5.54,"roc":2.82,"eyRank":45,"rocRank":72,"score":117.0,"finRatio":103.2,"debtShare":14.8,"volume":5.7},{"rank":66,"ticker":"ARCLK","name":"Arçelik","period":"2026/6","group":"June","ey":3.72,"roc":5.94,"eyRank":56,"rocRank":62,"score":118.0,"finRatio":392.5,"debtShare":121.0,"volume":3.4},{"rank":67,"ticker":"AKCNS","name":"Akçansa","period":"2026/6","group":"June","ey":2.57,"roc":4.59,"eyRank":65,"rocRank":66,"score":131.0,"finRatio":90.3,"debtShare":1.7,"volume":2.7},{"rank":68,"ticker":"EREGL","name":"Ereğli Demir Çelik","period":"2026/6","group":"June","ey":3.66,"roc":2.61,"eyRank":58,"rocRank":74,"score":132.0,"finRatio":123.9,"debtShare":9.0,"volume":125.8},{"rank":69,"ticker":"AYGAZ","name":"Aygaz","period":"2026/6","group":"June","ey":3.34,"roc":2.7,"eyRank":61,"rocRank":73,"score":134.0,"finRatio":44.1,"debtShare":-4.6,"volume":6.4},{"rank":70,"ticker":"RALYH","name":"Ral Yatırım Holding","period":"2026/6","group":"June","ey":0.88,"roc":6.69,"eyRank":75,"rocRank":60,"score":135.0,"finRatio":74.3,"debtShare":30.1,"volume":17.5},{"rank":71,"ticker":"BIGEN","name":"Birleşim Grup Enerji","period":"2026/6","group":"June","ey":0.37,"roc":7.41,"eyRank":78,"rocRank":57,"score":135.0,"finRatio":119.0,"debtShare":58.5,"volume":15.0},{"rank":72,"ticker":"GRTHO","name":"GrainTurk Tarım","period":"2026/6","group":"June","ey":1.66,"roc":3.85,"eyRank":68,"rocRank":68,"score":136.0,"finRatio":59.3,"debtShare":-8.9,"volume":6.5},{"rank":73,"ticker":"CVKMD","name":"Cvk Maden","period":"2026/6","group":"June","ey":0.9,"roc":4.74,"eyRank":74,"rocRank":65,"score":139.0,"finRatio":376.1,"debtShare":29.7,"volume":13.9},{"rank":74,"ticker":"PGSUS","name":"Pegasus Hava Taşımacılığı","period":"2026/6","group":"June","ey":2.51,"roc":1.97,"eyRank":66,"rocRank":76,"score":142.0,"finRatio":232.2,"debtShare":56.1,"volume":37.7},{"rank":75,"ticker":"KLRHO","name":"Kiler Holding","period":"2026/6","group":"June","ey":1.65,"roc":2.51,"eyRank":69,"rocRank":75,"score":144.0,"finRatio":44.6,"debtShare":-10.6,"volume":8.8},{"rank":76,"ticker":"SASA","name":"Sasa Polyester Sanayi A.Ş.","period":"2026/6","group":"June","ey":1.52,"roc":1.31,"eyRank":70,"rocRank":78,"score":148.0,"finRatio":744.0,"debtShare":44.8,"volume":151.3},{"rank":77,"ticker":"PASEU","name":"Pasifik Eurasia","period":"2026/6","group":"June","ey":0.09,"roc":3.11,"eyRank":82,"rocRank":70,"score":152.0,"finRatio":194.2,"debtShare":30.7,"volume":34.3},{"rank":78,"ticker":"ECZYT","name":"Eczacıbaşı Yatırım","period":"2026/6","group":"June","ey":0.86,"roc":0.89,"eyRank":76,"rocRank":80,"score":156.0,"finRatio":0.0,"debtShare":-1.9,"volume":3.1},{"rank":79,"ticker":"TEHOL","name":"Tera Holding","period":"2026/6","group":"June","ey":0.17,"roc":1.15,"eyRank":79,"rocRank":79,"score":158.0,"finRatio":1652.2,"debtShare":-45.8,"volume":38.9},{"rank":80,"ticker":"ECILC","name":"Eczacıbaşı İlaç","period":"2026/6","group":"June","ey":0.5,"roc":0.36,"eyRank":77,"rocRank":82,"score":159.0,"finRatio":301.2,"debtShare":1.9,"volume":6.7},{"rank":81,"ticker":"OZATD","name":"Özata Denizcilik","period":"2026/6","group":"June","ey":0.03,"roc":1.79,"eyRank":83,"rocRank":77,"score":160.0,"finRatio":360.5,"debtShare":18.2,"volume":34.7},{"rank":82,"ticker":"MAGEN","name":"Margün Enerji","period":"2026/6","group":"June","ey":0.11,"roc":0.51,"eyRank":80,"rocRank":81,"score":161.0,"finRatio":1292.9,"debtShare":29.9,"volume":16.6},{"rank":83,"ticker":"SISE","name":"Şişecam","period":"2026/6","group":"June","ey":0.1,"roc":0.07,"eyRank":81,"rocRank":83,"score":164.0,"finRatio":10296.7,"debtShare":36.7,"volume":47.1},{"rank":84,"ticker":"LIDER","name":"Lider Turizm","period":"2026/6","group":"June","ey":-0.02,"roc":-0.03,"eyRank":84,"rocRank":84,"score":168.0,"finRatio":-24762.3,"debtShare":-67.2,"volume":14.1},{"rank":85,"ticker":"VERUS","name":"Verusa Holding","period":"2026/6","group":"June","ey":-0.4,"roc":-2.1,"eyRank":89,"rocRank":86,"score":175.0,"finRatio":-303.9,"debtShare":-55.0,"volume":1.5},{"rank":86,"ticker":"ODINE","name":"Odine Solutions","period":"2026/6","group":"June","ey":-0.03,"roc":-7.05,"eyRank":85,"rocRank":91,"score":176.0,"finRatio":-47.1,"debtShare":-64.1,"volume":23.6},{"rank":87,"ticker":"ALARK","name":"Alarko Holding","period":"2026/6","group":"June","ey":-1.86,"roc":-1.0,"eyRank":92,"rocRank":85,"score":177.0,"finRatio":-471.6,"debtShare":13.4,"volume":11.3},{"rank":88,"ticker":"KENT","name":"Kent Gıda","period":"2026/6","group":"June","ey":-0.34,"roc":-5.29,"eyRank":88,"rocRank":90,"score":178.0,"finRatio":-160.7,"debtShare":-0.0,"volume":0.0},{"rank":89,"ticker":"IEYHO","name":"Işıklar Enerji ve Yapı Holding","period":"2026/6","group":"June","ey":-0.15,"roc":-7.98,"eyRank":86,"rocRank":93,"score":179.0,"finRatio":-86.7,"debtShare":-0.1,"volume":23.5},{"rank":90,"ticker":"BSOKE","name":"Batıçim Çimento","period":"2026/3","group":"March","ey":-1.18,"roc":-3.38,"eyRank":91,"rocRank":88,"score":179.0,"finRatio":-178.9,"debtShare":18.9,"volume":3.2},{"rank":91,"ticker":"KUYAS","name":"Kuyas Yatırım AŞ","period":"2026/3","group":"March","ey":-0.57,"roc":-7.28,"eyRank":90,"rocRank":92,"score":182.0,"finRatio":-492.8,"debtShare":21.9,"volume":12.8},{"rank":92,"ticker":"KLYPV","name":"Kalyon Güneş Teknolojileri","period":"2026/6","group":"June","ey":-2.45,"roc":-3.55,"eyRank":93,"rocRank":89,"score":182.0,"finRatio":-171.5,"debtShare":50.4,"volume":3.2},{"rank":93,"ticker":"MOGAN","name":"Mogan Enerji","period":"2026/6","group":"June","ey":-5.16,"roc":-2.6,"eyRank":98,"rocRank":87,"score":185.0,"finRatio":-318.3,"debtShare":20.1,"volume":9.5},{"rank":94,"ticker":"GUNDG","name":"Gündoğdu Gıda","period":"2026/6","group":"June","ey":-0.15,"roc":-11.89,"eyRank":87,"rocRank":99,"score":186.0,"finRatio":-2.7,"debtShare":-77.2,"volume":15.0},{"rank":95,"ticker":"TKFEN","name":"Tekfen Holding","period":"2026/3","group":"March","ey":-4.06,"roc":-8.85,"eyRank":97,"rocRank":94,"score":191.0,"finRatio":-114.1,"debtShare":16.0,"volume":24.0},{"rank":96,"ticker":"TTRAK","name":"Türk Traktör","period":"2026/6","group":"June","ey":-2.99,"roc":-10.44,"eyRank":94,"rocRank":97,"score":191.0,"finRatio":-275.0,"debtShare":60.2,"volume":1.4},{"rank":97,"ticker":"OTKAR","name":"Otokar","period":"2026/6","group":"June","ey":-3.22,"roc":-10.79,"eyRank":95,"rocRank":98,"score":193.0,"finRatio":-425.5,"debtShare":175.6,"volume":7.4},{"rank":98,"ticker":"PETKM","name":"Petkim","period":"2026/6","group":"June","ey":-9.55,"roc":-8.86,"eyRank":99,"rocRank":95,"score":194.0,"finRatio":-119.3,"debtShare":45.4,"volume":34.3},{"rank":99,"ticker":"MGROS","name":"Migros","period":"2026/6","group":"June","ey":-10.06,"roc":-10.24,"eyRank":100,"rocRank":96,"score":196.0,"finRatio":-102.7,"debtShare":6.2,"volume":34.5},{"rank":100,"ticker":"ANELE","name":"Anel Elektrik","period":"2026/6","group":"June","ey":-3.67,"roc":-217.09,"eyRank":96,"rocRank":101,"score":197.0,"finRatio":-21.5,"debtShare":-16.5,"volume":12.3},{"rank":101,"ticker":"SOKM","name":"Şok Marketler","period":"2026/6","group":"June","ey":-22.0,"roc":-17.54,"eyRank":101,"rocRank":100,"score":201.0,"finRatio":-118.0,"debtShare":-1.0,"volume":6.5}];
+
+  // ---------- color ramp ----------
+  const LIGHT_STOPS = [
+    [0,   "#FBEAE6"], [35,  "#EFAF97"], [70,  "#DE7A54"],
+    [92,  "#BF4A2A"], [118, "#A83420"], [150, "#7E2115"],
+  ];
+  const DARK_STOPS = [
+    [0,   "#3A231F"], [35,  "#6E3226"], [70,  "#A8452B"],
+    [92,  "#CE6238"], [118, "#E27B48"], [150, "#F4A578"],
+  ];
+  // Diverging: teal (net cash) <-> neutral gray (0%) <-> red (debt-funded capital),
+  // reusing the same red family as the financing ramp so "risk" reads consistently.
+  const DIVERGING_LIGHT_STOPS = [
+    [-100, "#1E4A45"], [-50, "#4F8A81"], [0, "#C7C9C2"], [50, "#DE7A54"], [100, "#7E2115"],
+  ];
+  const DIVERGING_DARK_STOPS = [
+    [-100, "#4FA89C"], [-50, "#2E6B63"], [0, "#4A524E"], [50, "#A8452B"], [100, "#F4A578"],
+  ];
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rampColor(value, stops, min, max) {
+    const v = Math.max(min, Math.min(max, value));
+    for (let i = 0; i < stops.length - 1; i++) {
+      const [p0, c0] = stops[i], [p1, c1] = stops[i + 1];
+      if (v >= p0 && v <= p1) {
+        const t = (v - p0) / (p1 - p0);
+        const [r0, g0, b0] = hexToRgb(c0), [r1, g1, b1] = hexToRgb(c1);
+        const r = Math.round(lerp(r0, r1, t));
+        const g = Math.round(lerp(g0, g1, t));
+        const b = Math.round(lerp(b0, b1, t));
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+  // WCAG relative luminance + contrast, to pick chip text color by computation
+  function relLum([r, g, b]) {
+    const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const [R, G, B] = [f(r), f(g), f(b)];
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  }
+  function contrastRgb(rgbStr, hex) {
+    const m = rgbStr.match(/\d+/g).map(Number);
+    const l1 = relLum(m), l2 = relLum(hexToRgb(hex));
+    const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  function isDarkMode() {
+    const t = document.documentElement.getAttribute("data-theme");
+    if (t === "dark") return true;
+    if (t === "light") return false;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function chipStyle(value, lightStops, darkStops, min, max) {
+    const dark = isDarkMode();
+    const bg = rampColor(value, dark ? darkStops : lightStops, min, max);
+    const cs = getComputedStyle(document.documentElement);
+    const textDark = cs.getPropertyValue("--chip-text-dark").trim();
+    const textLight = cs.getPropertyValue("--chip-text-light").trim();
+    const cd = contrastRgb(bg, textDark);
+    const cl = contrastRgb(bg, textLight);
+    return { background: bg, color: cd > cl ? textDark : textLight };
+  }
+
+  // ---------- formatting ----------
+  function fmtPct(v) { return (v > 0 ? "" : "") + v.toFixed(2) + "%"; }
+  function fmtFin(v) {
+    const s = Math.abs(v) >= 100 ? Math.round(v).toString() : v.toFixed(1);
+    return s + "%";
+  }
+
+  // ---------- state ----------
+  let DATA = DEFAULT_DATA;
+  let SOURCE = DEFAULT_SOURCE;
+  const tbody = document.getElementById("tableBody");
+  const table = document.getElementById("dataTable");
+  let sortKey = "rank", sortDir = "asc", filterText = "";
+
+  // ---------- meta chips + source line ----------
+  const metaRow = document.getElementById("metaRow");
+  function renderMeta() {
+    metaRow.innerHTML = "";
+    const nEstimated = DATA.filter(d => d.finRatio === null).length;
+    const nNegative = DATA.filter(d => d.ey <= 0).length;
+    [
+      `${DATA.length} names screened`,
+      `${nNegative} with negative TTM EBIT`,
+      `${nEstimated} missing financing-expense data`,
+      SOURCE.isSample ? "Sample data &middot; 2026/08/31" : `Loaded ${new Date(SOURCE.loadedAt).toLocaleDateString()}`,
+    ].forEach(t => {
+      const span = document.createElement("span");
+      span.className = "meta-chip";
+      span.innerHTML = t;
+      metaRow.appendChild(span);
+    });
+
+    const src = document.getElementById("sourceLine");
+    src.innerHTML = SOURCE.isSample
+      ? `Source: <code>${SOURCE.filename}</code> (Midas TTM financials, isyatirim metadata) &middot; ${DATA.length} names &middot; sample screen from 2026/08/31 &mdash; drop this month's CSV above to replace it.`
+      : `Source: <code>${SOURCE.filename}</code>, loaded into your browser on ${new Date(SOURCE.loadedAt).toLocaleString()} &middot; ${DATA.length} names. Nothing was uploaded anywhere &mdash; this file only lives in this browser.`;
+  }
+
+  // ---------- CSV parsing (RFC4180-ish: quoted fields, embedded commas/newlines/"") ----------
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        row.push(field); field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); field = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function cleanName(raw, ticker) {
+    let s = raw.replace(/\s+/g, " ").trim();
+    s = s.replace(new RegExp("^" + ticker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*-\\s*"), "");
+    s = s.replace(/\s*Hisse Senedi\s*$/, "").trim();
+    return s;
+  }
+
+  function num(v) {
+    if (v === undefined || v === null || v === "") return null;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function rowsFromCsvText(text) {
+    const grid = parseCsv(text);
+    if (grid.length < 2) throw new Error("File looks empty.");
+    const header = grid[0].map(h => h.trim());
+    const idx = {};
+    header.forEach((h, i) => { idx[h] = i; });
+    const required = ["Ticker", "Name", "EarningsYield", "RoC", "Magic_Score"];
+    const missing = required.filter(c => !(c in idx));
+    if (missing.length) throw new Error("Missing column(s): " + missing.join(", "));
+
+    return grid.slice(1)
+      .filter(r => r.length > 1 && r[idx["Ticker"]])
+      .map((r, i) => {
+        const ticker = r[idx["Ticker"]].trim();
+        const eyFrac = num(r[idx["EarningsYield"]]);
+        const rocFrac = num(r[idx["RoC"]]);
+        return {
+          rank: num(r[idx["Rank"]]) ?? (i + 1),
+          ticker,
+          name: cleanName(r[idx["Name"]] || ticker, ticker),
+          period: idx["Period"] !== undefined ? r[idx["Period"]] : "",
+          group: idx["Group"] !== undefined ? r[idx["Group"]] : "",
+          ey: eyFrac === null ? null : eyFrac * 100,
+          roc: rocFrac === null ? null : rocFrac * 100,
+          eyRank: num(r[idx["EY_Rank"]]),
+          rocRank: num(r[idx["RoC_Rank"]]),
+          score: num(r[idx["Magic_Score"]]),
+          finRatio: idx["FinansmanGideri_EBIT_%"] !== undefined ? num(r[idx["FinansmanGideri_EBIT_%"]]) : null,
+          debtShare: idx["DebtShareOfCapital_%"] !== undefined ? num(r[idx["DebtShareOfCapital_%"]]) : null,
+          volume: idx["Volume_mnUSD"] !== undefined ? num(r[idx["Volume_mnUSD"]]) : null,
+        };
+      })
+      .filter(d => d.ey !== null && d.roc !== null);
+  }
+
+  // ---------- upload wiring ----------
+  const uploadBar = document.getElementById("uploadBar");
+  const uploadStatus = document.getElementById("uploadStatus");
+  const resetLink = document.getElementById("resetLink");
+  const fileInput = document.getElementById("csvFileInput");
+  const STORAGE_KEY = "bistMagicFormula.lastUpload.v1";
+
+  function applyNewData(rows, filename, persist) {
+    DATA = rows;
+    SOURCE = { filename, loadedAt: Date.now(), isSample: false };
+    sortKey = "rank"; sortDir = "asc"; filterText = "";
+    document.getElementById("searchInput").value = "";
+    table.querySelectorAll("thead th").forEach(h => { h.dataset.active = "false"; h.querySelector(".arrow")?.remove(); });
+    renderMeta();
+    render();
+    resetLink.hidden = false;
+    uploadBar.classList.remove("error");
+    uploadStatus.classList.remove("error");
+    uploadStatus.textContent = `Loaded ${filename} — ${rows.length} names. Drop another CSV any time to refresh.`;
+    if (persist) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename, loadedAt: SOURCE.loadedAt, rows }));
+      } catch (e) { /* private mode / storage blocked — in-memory only for this session */ }
+    }
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name)) {
+      uploadBar.classList.add("error");
+      uploadStatus.classList.add("error");
+      uploadStatus.textContent = `"${file.name}" doesn't look like a .csv file — use the file this project's scripts save (magic_formula_all_*.csv).`;
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = rowsFromCsvText(reader.result);
+        if (!rows.length) throw new Error("No usable rows found in that file.");
+        applyNewData(rows, file.name, true);
+      } catch (err) {
+        uploadBar.classList.add("error");
+        uploadStatus.classList.add("error");
+        uploadStatus.textContent = `Couldn't read "${file.name}": ${err.message}`;
+      }
+    };
+    reader.onerror = () => {
+      uploadBar.classList.add("error");
+      uploadStatus.classList.add("error");
+      uploadStatus.textContent = `Couldn't read "${file.name}" — try again.`;
+    };
+    reader.readAsText(file);
+  }
+
+  document.getElementById("chooseFileBtn").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+
+  ["dragenter", "dragover"].forEach(evt =>
+    uploadBar.addEventListener(evt, (e) => { e.preventDefault(); uploadBar.classList.add("dragover"); })
+  );
+  ["dragleave", "drop"].forEach(evt =>
+    uploadBar.addEventListener(evt, (e) => { e.preventDefault(); uploadBar.classList.remove("dragover"); })
+  );
+  uploadBar.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+
+  resetLink.addEventListener("click", () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    DATA = DEFAULT_DATA;
+    SOURCE = DEFAULT_SOURCE;
+    sortKey = "rank"; sortDir = "asc"; filterText = "";
+    document.getElementById("searchInput").value = "";
+    table.querySelectorAll("thead th").forEach(h => { h.dataset.active = "false"; h.querySelector(".arrow")?.remove(); });
+    renderMeta();
+    render();
+    resetLink.hidden = true;
+    uploadBar.classList.remove("error");
+    uploadStatus.classList.remove("error");
+    uploadStatus.textContent = "Showing sample data — drag your magic_formula_all_*.csv here, or click Choose file.";
+  });
+
+  // Restore the last CSV this browser loaded, if any, so a monthly refresh sticks around.
+  (function restoreFromStorage() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (!parsed || !Array.isArray(parsed.rows) || !parsed.rows.length) return;
+      DATA = parsed.rows;
+      SOURCE = { filename: parsed.filename, loadedAt: parsed.loadedAt, isSample: false };
+      resetLink.hidden = false;
+      uploadStatus.textContent = `Loaded ${parsed.filename} — ${parsed.rows.length} names (restored from your last visit).`;
+    } catch (e) { /* fall back to sample data */ }
+  })();
+
+  function render() {
+    const q = filterText.trim().toLowerCase();
+    let rows = DATA.filter(d =>
+      !q || d.ticker.toLowerCase().includes(q) || d.name.toLowerCase().includes(q)
+    );
+
+    rows.sort((a, b) => {
+      let av = a[sortKey], bv = b[sortKey];
+      if (sortKey === "finRatio" || sortKey === "debtShare") {
+        if (av === null) return 1;
+        if (bv === null) return -1;
+      }
+      if (typeof av === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+
+    tbody.innerHTML = "";
+
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="empty-state" colspan="9">No ticker matches "${filterText}".</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    for (const d of rows) {
+      const tr = document.createElement("tr");
+
+      const eyClass = d.ey < 0 ? "neg" : "";
+      const rocClass = d.roc < 0 ? "neg" : "";
+
+      let finCell;
+      if (d.finRatio === null) {
+        finCell = `<span class="ratio-dash">&mdash;</span>`;
+      } else if (d.ey <= 0) {
+        finCell = `<span class="fin-na" title="Ratio would be ${d.finRatio}% &mdash; not meaningful with negative EBIT">EBIT&nbsp;neg.</span>`;
+      } else {
+        const st = chipStyle(d.finRatio, LIGHT_STOPS, DARK_STOPS, 0, 150);
+        finCell = `<span class="ratio-chip" style="background:${st.background};color:${st.color}">${fmtFin(d.finRatio)}</span>`;
+      }
+
+      let debtCell;
+      if (d.debtShare === null) {
+        debtCell = `<span class="ratio-dash">&mdash;</span>`;
+      } else {
+        const st = chipStyle(d.debtShare, DIVERGING_LIGHT_STOPS, DIVERGING_DARK_STOPS, -100, 100);
+        debtCell = `<span class="ratio-chip" style="background:${st.background};color:${st.color}">${fmtFin(d.debtShare)}</span>`;
+      }
+
+      const volFlag = (d.volume !== null && d.volume < 5)
+        ? `<span class="liquidity-flag"><span class="liquidity-dot" title="Average volume under 5 mn$/day"></span>${d.volume.toFixed(1)}</span>`
+        : (d.volume !== null ? d.volume.toFixed(1) : "&mdash;");
+
+      const eyBadge = d.eyRank !== null ? `<span class="rank-badge">#${d.eyRank}</span>` : "";
+      const rocBadge = d.rocRank !== null ? `<span class="rank-badge">#${d.rocRank}</span>` : "";
+
+      tr.innerHTML = `
+        <td class="col-rank">${d.rank}</td>
+        <td class="col-name">
+          <span class="ticker">${d.ticker}</span>
+          <span class="company">${d.name}</span>
+        </td>
+        <td class="col-period">${d.period}</td>
+        <td class="num-cell ${eyClass}">${fmtPct(d.ey)}${eyBadge}</td>
+        <td class="num-cell ${rocClass}">${fmtPct(d.roc)}${rocBadge}</td>
+        <td>${finCell}</td>
+        <td>${debtCell}</td>
+        <td class="num-cell score-cell">${d.score !== null ? d.score.toFixed(0) : "&mdash;"}</td>
+        <td class="num-cell">${volFlag}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  table.querySelectorAll("thead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if (sortKey === key) {
+        sortDir = sortDir === "asc" ? "desc" : "asc";
+      } else {
+        sortKey = key;
+        sortDir = th.dataset.type === "text" ? "asc" : (key === "rank" || key === "score" ? "asc" : "desc");
+      }
+      table.querySelectorAll("thead th").forEach(h => {
+        h.dataset.active = "false";
+        h.querySelector(".arrow")?.remove();
+      });
+      th.dataset.active = "true";
+      const arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = sortDir === "asc" ? "↑" : "↓";
+      th.appendChild(arrow);
+      render();
+    });
+  });
+
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    filterText = e.target.value;
+    render();
+  });
+
+  renderMeta();
+  render();
+</script>

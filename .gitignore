@@ -1,0 +1,15 @@
+# Generated data — every run produces new dated CSVs/logs, not worth versioning
+*.csv
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+myenv/
+env/
+
+# OS / editor
+.DS_Store
+.vscode/
