@@ -1,21 +1,34 @@
+import argparse
 import glob
 import os
 import pandas as pd
 from datetime import datetime
 
 # ── Load raw data ──────────────────────────────────────────────────────────────
-# Don't assume today's date — pick the most recently *modified* raw file on
-# disk. Hardcoding today's date meant this script only worked if run the same
-# calendar day as bist.py's fetch; any later re-run (e.g. to try a different
-# filter) would crash with FileNotFoundError since no file matches today.
-#raw_files = glob.glob("bist_greenblatt_raw_*.csv")
-#if not raw_files:
-#    raise FileNotFoundError(
-#        "No bist_greenblatt_raw_*.csv found in this directory. "
-#        "Run bist.py first, or place a raw file here."
-#    )
-#raw_path = max(raw_files, key=os.path.getmtime)
-raw_path = "bist_greenblatt_raw_20260831_midasonly.csv"
+# Accepts an explicit --raw path (used by run_daily.py so it always processes
+# the file it just fetched, regardless of what else is lying around). With no
+# --raw, falls back to the most recently *modified* raw CSV on disk — picking
+# today's date would only work if this ran the same calendar day as the fetch;
+# any later re-run (e.g. to try a different filter) would otherwise crash with
+# FileNotFoundError since no file matches today.
+parser = argparse.ArgumentParser(description="Apply Magic Formula filters + leverage columns to a raw CSV")
+parser.add_argument("--raw", help="Path to the raw CSV to process. Defaults to the most recently modified bist_greenblatt_raw_*.csv")
+parser.add_argument("--out", help="Path to write the ranked output CSV to. Defaults to magic_formula_all_<today>.csv")
+args, _ = parser.parse_known_args()
+
+if args.raw:
+    raw_path = args.raw
+    if not os.path.exists(raw_path):
+        raise FileNotFoundError(f"--raw path does not exist: {raw_path}")
+else:
+    raw_files = glob.glob("bist_greenblatt_raw_*.csv")
+    if not raw_files:
+        raise FileNotFoundError(
+            "No bist_greenblatt_raw_*.csv found in this directory. "
+            "Run bist_magic_formula_midas.py first, or pass --raw <path>."
+        )
+    raw_path = max(raw_files, key=os.path.getmtime)
+
 df = pd.read_csv(raw_path)
 print(f"Loaded {raw_path}")
 print(f"Total stocks in raw file: {len(df)}")
@@ -90,7 +103,7 @@ for col in big_number_cols:
 
 # ── Save ───────────────────────────────────────────────────────────────────────
 date_str = datetime.now().strftime('%Y%m%d')
-filename = f"magic_formula_all_{date_str}.csv"
+filename = args.out or f"magic_formula_all_{date_str}.csv"
 df.to_csv(filename, index=True, index_label="Rank")
 
 print(f"\nSaved → {filename}")

@@ -225,6 +225,17 @@
   }
   .search-field input:focus-visible { outline: 2px solid var(--focus); }
   .search-field input::placeholder { color: var(--ink-faint); }
+  .search-field select {
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    outline-offset: 2px;
+  }
+  .search-field select:focus-visible { outline: 2px solid var(--focus); }
 
   .legends {
     display: flex;
@@ -483,6 +494,10 @@
     <div class="search-field">
       <label for="searchInput">Filter by ticker or name</label>
       <input id="searchInput" type="text" placeholder="e.g. TTKOM, Tüpraş&hellip;" autocomplete="off" />
+    </div>
+    <div class="search-field" id="dateFieldWrap" hidden>
+      <label for="dateSelect">Browse archived day</label>
+      <select id="dateSelect"></select>
     </div>
     <div class="legends">
       <div class="legend">
@@ -822,6 +837,58 @@
     } catch (e) { /* fall back to sample data */ }
   })();
 
+  // ---------- archive browsing (auto-loads archive/manifest.json + dated
+  // CSVs when this page is hosted next to that folder, e.g. on GitHub Pages;
+  // silently does nothing when opened as a local file with no archive/ around
+  // it, leaving the sample/localStorage/drag-drop flow above untouched) ----
+  const dateFieldWrap = document.getElementById("dateFieldWrap");
+  const dateSelect = document.getElementById("dateSelect");
+
+  function formatDateLabel(d) {
+    return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+  }
+
+  async function loadArchivedDate(dateStr) {
+    const filename = `magic_formula_all_${dateStr}.csv`;
+    const res = await fetch(`archive/${filename}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = rowsFromCsvText(await res.text());
+    if (!rows.length) throw new Error("No usable rows in that archived file.");
+    applyNewData(rows, `${filename} (archive)`, false);
+    dateSelect.value = dateStr;
+  }
+
+  dateSelect.addEventListener("change", (e) => {
+    loadArchivedDate(e.target.value).catch(err => {
+      uploadBar.classList.add("error");
+      uploadStatus.classList.add("error");
+      uploadStatus.textContent = `Couldn't load ${formatDateLabel(e.target.value)}: ${err.message}`;
+    });
+  });
+
+  async function tryLoadArchiveHistory() {
+    try {
+      const res = await fetch("archive/manifest.json", { cache: "no-store" });
+      if (!res.ok) return;
+      const dates = (await res.json()).dates || [];
+      if (!dates.length) return;
+
+      dateSelect.innerHTML = "";
+      for (const d of dates) {
+        const opt = document.createElement("option");
+        opt.value = d;
+        opt.textContent = formatDateLabel(d);
+        dateSelect.appendChild(opt);
+      }
+      dateFieldWrap.hidden = false;
+
+      await loadArchivedDate(dates[0]);  // most recent day, first in the manifest
+    } catch (e) {
+      // No manifest reachable — e.g. opened as a local file, or archive/ is
+      // empty before the first daily run. Keep the sample/restored data as-is.
+    }
+  }
+
   function render() {
     const q = filterText.trim().toLowerCase();
     let rows = DATA.filter(d =>
@@ -927,4 +994,5 @@
 
   renderMeta();
   render();
+  tryLoadArchiveHistory();
 </script>

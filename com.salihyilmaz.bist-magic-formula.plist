@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.salihyilmaz.bist-magic-formula</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/seaman_waves/miniconda3/bin/python3</string>
+        <string>/Users/seaman_waves/Desktop/AI-MAGIC-FORMULA-BIST/run_daily.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/seaman_waves/Desktop/AI-MAGIC-FORMULA-BIST</string>
+
+    <!-- Runs once a day at 19:00 local time (after BIST's 18:00 Istanbul close).
+         Change Hour/Minute below and re-run setup_launchd.sh to reschedule. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>19</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- launchd's own capture of stdout/stderr, as a safety net alongside
+         run_daily.py's own logs/run_<date>.log. -->
+    <key>StandardOutPath</key>
+    <string>/Users/seaman_waves/Desktop/AI-MAGIC-FORMULA-BIST/logs/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/seaman_waves/Desktop/AI-MAGIC-FORMULA-BIST/logs/launchd.err.log</string>
+
+    <!-- Only fire on the schedule above, not immediately every time this job
+         is (re)loaded (e.g. on every login/reboot). -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

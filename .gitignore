@@ -1,6 +1,13 @@
 # Generated data — every run produces new dated CSVs/logs, not worth versioning
 *.csv
 *.log
+*.numbers
+
+# ...except the daily ranked snapshots in archive/, which run_daily.py commits
+# and pushes so magic_formula_heatmap.html can serve them on GitHub Pages.
+# Everything else archived (raw fetch, intermediate combined ranking) stays
+# local-only.
+!archive/magic_formula_all_*.csv
 
 # Python
 __pycache__/
