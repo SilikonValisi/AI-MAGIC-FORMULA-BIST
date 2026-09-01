@@ -202,7 +202,13 @@ def publish_to_github(date_str: str, summary_line: str, log_file) -> None:
         print(f"[WARN] git commit failed:\n{commit.stdout}{commit.stderr}")
         return
 
-    push = git("push", "origin", "HEAD")
+    # Explicit "HEAD:main" rather than bare "HEAD": actions/checkout leaves a
+    # GitHub Actions runner in detached-HEAD state (checked out to a specific
+    # SHA, not a tracked branch), where "git push origin HEAD" fails outright
+    # ("You are not currently on a branch") since there's no current branch
+    # name to infer a destination from. Naming the branch explicitly works in
+    # both that case and a normal local clone.
+    push = git("push", "origin", "HEAD:main")
     log_file.write(f"git push: {push.returncode}\n{push.stdout}{push.stderr}\n")
     if push.returncode != 0:
         print(f"[WARN] git push failed — today's data is committed locally but not published:\n{push.stdout}{push.stderr}")
