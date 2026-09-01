@@ -41,9 +41,19 @@ HEADERS = {
     )
 }
 
-ISYATIRIM_CARD_URL = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={ticker}"
-MIDAS_QUOTE_URL    = "https://www.getmidas.com/canli-borsa/{ticker}-hisse/"
-MIDAS_API_URL      = "https://www.getmidas.com/wp-json/midas-api/v1/midas_bilnaco_date"
+ISYATIRIM_CARD_URL       = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={ticker}"
+ISYATIRIM_COMPARISON_URL = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/Temel-Degerler-Ve-Oranlar.aspx"
+MIDAS_QUOTE_URL          = "https://www.getmidas.com/canli-borsa/{ticker}-hisse/"
+MIDAS_API_URL            = "https://www.getmidas.com/wp-json/midas-api/v1/midas_bilnaco_date"
+
+# Purely a prefilter to skip the expensive per-ticker fetch_stock() pipeline
+# for names that almost certainly won't clear apply_magic_formula_to_all.py's
+# real 25,000 mn TL floor. Kept well below that real threshold as a safety
+# margin because this number comes from isyatirim's bulk comparison table,
+# while the actual market cap that ends up in the CSV and gets filtered on
+# later still comes from fetch_market_cap() (Midas) — a different source
+# that can disagree slightly with isyatirim near the boundary.
+PREFILTER_MARKET_CAP_FLOOR_MN_TL = 20_000
 
 # (connect, read). A tight connect timeout fails fast on an unreachable host;
 # the longer read timeout still allows for a slow response body.
@@ -282,6 +292,53 @@ def fetch_market_cap(ticker: str) -> float | None:
     text = BeautifulSoup(resp.text, "lxml").get_text()
     value = parse_turkish_number(extract_after_keyword(text, "Piyasa Değeri", 50))
     return value / 1_000_000 if value is not None else None
+
+
+def fetch_market_cap_lookup() -> dict[str, float]:
+    """
+    One request to isyatirim's fundamentals comparison page, which renders a
+    table of every listed stock's ticker and market cap (mn TL) in a single
+    page load — used to cheaply prefilter which tickers are even worth
+    running the full per-ticker fetch_stock() pipeline on, instead of paying
+    for isyatirim + Midas financials calls on names that will just get
+    dropped later by the market-cap floor anyway.
+
+    Returns {} on any failure (page unreachable, layout changed) rather than
+    raising — callers should treat an empty dict as "couldn't prefilter, fall
+    back to fetching everything" rather than "nothing has a big enough
+    market cap".
+    """
+    resp = request_with_retry(ISYATIRIM_COMPARISON_URL)
+    if resp is None:
+        return {}
+
+    soup = BeautifulSoup(resp.text, "lxml")
+    table = None
+    header = []
+    for candidate in soup.find_all("table"):
+        rows = candidate.find_all("tr")
+        if not rows:
+            continue
+        candidate_header = [c.get_text(strip=True) for c in rows[0].find_all(["th", "td"])]
+        if "Kod" in candidate_header and any(h.startswith("Piyasa Değeri(mn TL)") for h in candidate_header):
+            table, header = candidate, candidate_header
+            break
+    if table is None:
+        return {}
+
+    ticker_idx = header.index("Kod")
+    cap_idx = next(i for i, h in enumerate(header) if h.startswith("Piyasa Değeri(mn TL)"))
+
+    caps: dict[str, float] = {}
+    for row in table.find_all("tr")[1:]:
+        cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+        if len(cells) <= max(ticker_idx, cap_idx):
+            continue
+        ticker = cells[ticker_idx].strip().upper()
+        cap = parse_turkish_number(cells[cap_idx])
+        if ticker and cap is not None:
+            caps[ticker] = cap
+    return caps
 
 
 # ── Text Parsing (isyatirim page) ──────────────────────────────────────────────
@@ -601,6 +658,13 @@ def main():
              "period, net debt, and volume are reused from that CSV as-is."
     )
     parser.add_argument("--input", help="Existing raw CSV to refresh. Required with --midas-only.")
+    parser.add_argument(
+        "--no-prefilter", action="store_true",
+        help="Skip the bulk market-cap prefilter and run the full per-ticker fetch on "
+             "every ticker in --tickers, even ones that would almost certainly get "
+             "dropped later by the market-cap floor. Use if isyatirim's comparison "
+             "page is unreachable or its layout changed."
+    )
     args, _ = parser.parse_known_args()
 
     date_str = datetime.now().strftime("%Y%m%d")
@@ -617,6 +681,24 @@ def main():
         return
 
     tickers = load_tickers(args.tickers)
+
+    if not args.no_prefilter:
+        print("\n[Prefilter] Fetching market caps in bulk from isyatirim...")
+        caps = fetch_market_cap_lookup()
+        if caps:
+            before = len(tickers)
+            # Keep anything at/above the floor, AND anything the bulk table
+            # didn't have an entry for at all — an unmatched ticker is a sign
+            # of a naming mismatch, not evidence it's actually small, so it's
+            # safer to still fetch it than to silently drop it.
+            tickers = [t for t in tickers if t not in caps or caps[t] >= PREFILTER_MARKET_CAP_FLOOR_MN_TL]
+            print(
+                f"[Prefilter] {before} -> {len(tickers)} tickers "
+                f"(kept >= {PREFILTER_MARKET_CAP_FLOOR_MN_TL:,} mn TL, or unmatched in the bulk table)\n"
+            )
+        else:
+            print("[Prefilter] Couldn't fetch the bulk market cap table — proceeding with the full ticker list.\n")
+
     print(f"\nFetching data for {len(tickers)} tickers with {args.workers} threads...\n")
     results = run_all(tickers, fetch_stock, args.workers)
     save_and_rank(results, date_str, args.by_group)

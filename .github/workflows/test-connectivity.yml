@@ -1,11 +1,11 @@
-name: Inspect isyatirim comparison page for bulk market cap data
+name: Test the bulk market-cap prefilter
 
-# One-off diagnostic: get_stocks.py already fetches this page for the ticker
-# dropdown (<option> tags), but never checked whether it also renders a data
-# table with market cap per ticker in the same page load — which would let us
-# get market caps for the whole exchange in a handful of requests instead of
-# one per ticker. isyatirim is geo-blocked from the maintainer's machine, so
-# this has to run where it's actually reachable. Delete once answered.
+# One-off diagnostic: run the real fetch_market_cap_lookup() + prefilter
+# logic against the actual bist_tickers.txt universe and report how many
+# tickers it matched, how many survive the prefilter, and spot-check a few
+# known large/small caps. isyatirim is geo-blocked from the maintainer's
+# machine, so this has to run where it's actually reachable. Delete once
+# the prefilter is confirmed working.
 on:
   push:
     branches: [main]
@@ -16,56 +16,54 @@ permissions:
   contents: write
 
 jobs:
-  inspect:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install requests beautifulsoup4 lxml
+      - run: pip install -r requirements.txt
 
-      - name: Inspect the page
+      - name: Run the prefilter against the real ticker universe
         run: |
           python3 -c "
-          import requests
-          from bs4 import BeautifulSoup
-          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'}
-          url = 'https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/Temel-Degerler-Ve-Oranlar.aspx'
-          r = requests.get(url, headers=headers, timeout=25, verify=False)
-          out = [f'status={r.status_code} len={len(r.text)}']
-          soup = BeautifulSoup(r.text, 'lxml')
+          import sys
+          sys.path.insert(0, '.')
+          from bist_magic_formula_midas import fetch_market_cap_lookup, load_tickers, PREFILTER_MARKET_CAP_FLOOR_MN_TL
 
-          tables = soup.find_all('table')
-          out.append(f'num tables: {len(tables)}')
-          for i, t in enumerate(tables):
-              rows = t.find_all('tr')
-              header = [c.get_text(strip=True) for c in rows[0].find_all(['th','td'])] if rows else []
-              out.append(f'table[{i}]: {len(rows)} rows, header={header[:15]}')
-              if len(rows) > 1:
-                  sample = [c.get_text(strip=True) for c in rows[1].find_all(['th','td'])]
-                  out.append(f'  sample row: {sample[:15]}')
+          tickers = load_tickers('bist_tickers.txt')
+          caps = fetch_market_cap_lookup()
 
-          options = soup.find_all('option')
-          out.append(f'num <option> tags: {len(options)}')
+          out = []
+          out.append(f'bulk table matched {len(caps)} tickers total')
+          matched = [t for t in tickers if t in caps]
+          unmatched = [t for t in tickers if t not in caps]
+          out.append(f'of {len(tickers)} tickers in bist_tickers.txt: {len(matched)} matched, {len(unmatched)} unmatched')
+          out.append(f'unmatched sample: {unmatched[:20]}')
 
-          text = r.text.lower()
-          out.append(f'contains \"piyasa değeri\": {\"piyasa değeri\" in text or \"piyasa deg\" in text}')
-          out.append(f'contains ajax/json hints: {\"ajax\" in text}, {\".json\" in text}')
+          survivors = [t for t in tickers if t not in caps or caps[t] >= PREFILTER_MARKET_CAP_FLOOR_MN_TL]
+          out.append(f'prefilter (>= {PREFILTER_MARKET_CAP_FLOOR_MN_TL:,} mn TL or unmatched): {len(tickers)} -> {len(survivors)}')
 
-          with open('page_inspection_result.txt', 'w') as f:
-              f.write(chr(10).join(out) + chr(10))
-              f.write(chr(10) + '--- first 3000 chars of raw HTML ---' + chr(10))
-              f.write(r.text[:3000])
-          print(chr(10).join(out))
+          for spot in ['THYAO', 'ASELS', 'AKBNK', 'AVTUR', 'TUPRS']:
+              out.append(f'  {spot}: cap={caps.get(spot)} in_bist_tickers={spot in tickers}')
+
+          # a few of the smallest matched caps, to sanity-check they got dropped
+          smallest = sorted(((t, c) for t, c in caps.items() if t in tickers), key=lambda x: x[1])[:10]
+          out.append(f'10 smallest matched (in bist_tickers.txt): {smallest}')
+
+          text = chr(10).join(out)
+          print(text)
+          with open('result.txt', 'w') as f:
+              f.write(text + chr(10))
           "
 
       - name: Commit result
         run: |
           mkdir -p .github/test-results
-          mv page_inspection_result.txt .github/test-results/result.txt
+          mv result.txt .github/test-results/result.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .github/test-results/result.txt
-          git commit -m "Page inspection result" || echo "nothing to commit"
+          git commit -m "Prefilter test result" || echo "nothing to commit"
           git push
