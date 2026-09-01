@@ -1,0 +1,2 @@
+REACHABLE
+{'Ticker': 'THYAO', 'Name': 'THYAO - Türk Hava Yolları \n\tHisse Senedi', 'Period': '2026/6', 'Group': 'June', 'EnterpriseValue': 1039903000000.0, 'EarningsYield': 0.058180426443620224, 'MarketCap_mnTL': 419520.0, 'NetDebt_mnTL': 620383.0, 'Volume_mnUSD': 328.1, 'EBIT_TTM': 60502000000.0, 'EBIT_Estimated': False, 'RoC': 0.03386348931292412, 'FinansmanGideri': 38145000000.0}
