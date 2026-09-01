@@ -34,22 +34,32 @@ RANKED_RE = re.compile(r"magic_formula_all_(\d{8})\.csv$")
 
 
 def run_step(name: str, args: list[str], log_file) -> bool:
-    """Run one pipeline step as a subprocess, streaming output to both the
-    console (when attached to one) and the log file. Returns True on success."""
+    """Run one pipeline step as a subprocess, streaming output line-by-line to
+    both the console (when attached to one) and the log file as it's produced
+    — a full fetch takes minutes, and buffering everything until the process
+    exits (subprocess.run's default) makes it look hung. Returns True on
+    success."""
     print(f"\n{'=' * 60}\n{name}\n{'=' * 60}")
     log_file.write(f"\n{'=' * 60}\n{name}\n{'=' * 60}\n")
     log_file.flush()
 
-    proc = subprocess.run(
-        [sys.executable, *args],
+    proc = subprocess.Popen(
+        # -u: unbuffered stdout in the child. Without it, Python fully
+        # block-buffers stdout when it isn't a terminal (i.e. always, once
+        # piped here), so output would still arrive in stalled chunks instead
+        # of per-ticker as bist_magic_formula_midas.py actually prints it.
+        [sys.executable, "-u", *args],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
-    print(proc.stdout)
-    log_file.write(proc.stdout)
-    log_file.flush()
+    for line in proc.stdout:
+        print(line, end="")
+        log_file.write(line)
+        log_file.flush()
+    proc.wait()
 
     if proc.returncode != 0:
         print(f"[ERROR] {name} exited with code {proc.returncode}")
