@@ -1,0 +1,41 @@
+name: Daily Magic Formula run
+
+# 15:30 UTC = 18:30 Istanbul time (BIST closes 18:00, TR has no DST), on
+# weekdays only — no reason to re-fetch on a day the exchange didn't trade.
+# GitHub schedules run in UTC regardless of where the repo/runner physically
+# is, which is also why this replaced the local launchd job in the first
+# place: isyatirim.com.tr was geo-blocked from the maintainer's actual
+# location, but is reachable from GitHub-hosted runners.
+on:
+  schedule:
+    - cron: "30 15 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run daily pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 run_daily.py
+
+      - name: Upload today's log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log-${{ github.run_id }}
+          path: logs/
+          retention-days: 30

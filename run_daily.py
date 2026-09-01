@@ -4,15 +4,21 @@ Daily orchestrator for the BIST Magic Formula pipeline.
 Runs the full fetch → filter/rank pipeline once, archives the raw + ranked
 CSVs it produces into archive/ (flat, dated filenames — matching the manual
 archive/magic_formula_all_<date>.csv convention already in use), then diffs
-today's ranking against the most recent prior archived day and fires a macOS
-notification summarizing what changed (new/dropped top-20 names, big rank
-movers).
+today's ranking against the most recent prior archived day and reports what
+changed (new/dropped top-20 names, big rank movers) — as a macOS banner when
+run locally, or a GitHub issue comment when run on a GitHub Actions runner
+(detected via the GITHUB_ACTIONS env var), since there's no desktop to show a
+banner on there.
 
-Intended to be triggered daily by launchd (see setup_launchd.sh), but safe to
-run by hand at any time — it will simply add one more dated snapshot.
+Runs either via GitHub Actions (see .github/workflows/daily.yml — the
+intended setup, since isyatirim.com.tr may be geo-blocked from wherever the
+local machine happens to be) or triggered locally by launchd (see
+setup_launchd.sh). Safe to run by hand at any time either way — it will
+simply add one more dated snapshot.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -29,6 +35,8 @@ LOG_DIR     = REPO_ROOT / "logs"
 
 TOP_N          = 20   # "top of the list" size for new-entrant/dropped tracking
 BIG_MOVE_RANKS = 10    # minimum |rank change| to call out as a "big mover"
+
+NOTIFY_ISSUE_TITLE = "Daily Magic Formula Updates"
 
 RANKED_RE = re.compile(r"magic_formula_all_(\d{8})\.csv$")
 
@@ -68,7 +76,20 @@ def run_step(name: str, args: list[str], log_file) -> bool:
     return True
 
 
-def notify(title: str, message: str) -> None:
+def notify(title: str, message: str, body: str | None = None) -> None:
+    """Notify about today's run: a macOS banner when run locally, or a
+    comment on a persistent GitHub issue when run unattended on a GitHub
+    Actions runner (no desktop to show a banner on, but `gh` is preinstalled
+    there and repo watchers get notified on new issue comments). `body`, if
+    given, is the fuller write-up (e.g. the full diff) used for the issue
+    comment; `message` alone is used for the terser macOS banner."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        _notify_github_issue(title, body or message)
+    else:
+        _notify_macos(title, message)
+
+
+def _notify_macos(title: str, message: str) -> None:
     """Fire a macOS banner notification. Best-effort — never raises."""
     try:
         # AppleScript string literals only need their own quotes/backslashes
@@ -81,6 +102,48 @@ def notify(title: str, message: str) -> None:
         )
     except FileNotFoundError:
         pass  # not on macOS / osascript unavailable — notification is best-effort
+
+
+def _get_or_create_notify_issue() -> str | None:
+    """Find the persistent "Daily Magic Formula Updates" issue (creating it
+    on the first run) that each day's update gets posted to as a comment,
+    rather than opening a new issue every day."""
+    listing = subprocess.run(
+        ["gh", "issue", "list", "--state", "all",
+         "--search", f'"{NOTIFY_ISSUE_TITLE}" in:title',
+         "--json", "number,title", "--limit", "10"],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if listing.returncode == 0:
+        try:
+            for issue in json.loads(listing.stdout):
+                if issue["title"] == NOTIFY_ISSUE_TITLE:
+                    return str(issue["number"])
+        except (ValueError, KeyError):
+            pass
+
+    created = subprocess.run(
+        ["gh", "issue", "create", "--title", NOTIFY_ISSUE_TITLE,
+         "--body", "Running log of daily BIST Magic Formula runs — one comment posted per day."],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if created.returncode != 0:
+        print(f"[WARN] Couldn't create notification issue:\n{created.stdout}{created.stderr}")
+        return None
+    match = re.search(r"/issues/(\d+)", created.stdout)
+    return match.group(1) if match else None
+
+
+def _notify_github_issue(title: str, body: str) -> None:
+    issue_number = _get_or_create_notify_issue()
+    if issue_number is None:
+        return
+    comment = subprocess.run(
+        ["gh", "issue", "comment", issue_number, "--body", f"**{title}**\n\n{body}"],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if comment.returncode != 0:
+        print(f"[WARN] Couldn't post notification comment:\n{comment.stdout}{comment.stderr}")
 
 
 def archived_ranked_files() -> list[tuple[str, Path]]:
@@ -117,6 +180,13 @@ def publish_to_github(date_str: str, summary_line: str, log_file) -> None:
     """
     def git(*args: str) -> subprocess.CompletedProcess:
         return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True)
+
+    # A fresh GitHub Actions checkout has no commit identity configured at
+    # all (unlike a local clone, where it's inherited from the user's own git
+    # config) — set one, scoped to this repo only, only if none exists yet.
+    if not git("config", "user.email").stdout.strip():
+        git("config", "user.name", "github-actions[bot]")
+        git("config", "user.email", "github-actions[bot]@users.noreply.github.com")
 
     add = git("add", f"archive/magic_formula_all_{date_str}.csv", "archive/manifest.json")
     log_file.write(f"git add: {add.returncode}\n{add.stdout}{add.stderr}\n")
@@ -256,7 +326,7 @@ def main():
 
         log_file.write(f"\n##### Run finished {datetime.now().isoformat()} — {summary_line} #####\n")
 
-    notify("BIST Magic Formula", summary_line)
+    notify("BIST Magic Formula", summary_line, body=diff_text or summary_line)
     print(f"\nDone. {summary_line}")
 
 
