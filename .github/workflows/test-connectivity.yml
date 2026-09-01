@@ -1,0 +1,71 @@
+name: Inspect isyatirim comparison page for bulk market cap data
+
+# One-off diagnostic: get_stocks.py already fetches this page for the ticker
+# dropdown (<option> tags), but never checked whether it also renders a data
+# table with market cap per ticker in the same page load — which would let us
+# get market caps for the whole exchange in a handful of requests instead of
+# one per ticker. isyatirim is geo-blocked from the maintainer's machine, so
+# this has to run where it's actually reachable. Delete once answered.
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/test-connectivity.yml"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests beautifulsoup4 lxml
+
+      - name: Inspect the page
+        run: |
+          python3 -c "
+          import requests
+          from bs4 import BeautifulSoup
+          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'}
+          url = 'https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/Temel-Degerler-Ve-Oranlar.aspx'
+          r = requests.get(url, headers=headers, timeout=25, verify=False)
+          out = [f'status={r.status_code} len={len(r.text)}']
+          soup = BeautifulSoup(r.text, 'lxml')
+
+          tables = soup.find_all('table')
+          out.append(f'num tables: {len(tables)}')
+          for i, t in enumerate(tables):
+              rows = t.find_all('tr')
+              header = [c.get_text(strip=True) for c in rows[0].find_all(['th','td'])] if rows else []
+              out.append(f'table[{i}]: {len(rows)} rows, header={header[:15]}')
+              if len(rows) > 1:
+                  sample = [c.get_text(strip=True) for c in rows[1].find_all(['th','td'])]
+                  out.append(f'  sample row: {sample[:15]}')
+
+          options = soup.find_all('option')
+          out.append(f'num <option> tags: {len(options)}')
+
+          text = r.text.lower()
+          out.append(f'contains \"piyasa değeri\": {\"piyasa değeri\" in text or \"piyasa deg\" in text}')
+          out.append(f'contains ajax/json hints: {\"ajax\" in text}, {\".json\" in text}')
+
+          with open('page_inspection_result.txt', 'w') as f:
+              f.write(chr(10).join(out) + chr(10))
+              f.write(chr(10) + '--- first 3000 chars of raw HTML ---' + chr(10))
+              f.write(r.text[:3000])
+          print(chr(10).join(out))
+          "
+
+      - name: Commit result
+        run: |
+          mkdir -p .github/test-results
+          mv page_inspection_result.txt .github/test-results/result.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/test-results/result.txt
+          git commit -m "Page inspection result" || echo "nothing to commit"
+          git push
