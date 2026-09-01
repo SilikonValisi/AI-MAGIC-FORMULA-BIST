@@ -1,0 +1,10 @@
+bulk table matched 627 tickers total
+of 481 tickers in bist_tickers.txt: 477 matched, 4 unmatched
+unmatched sample: ['G', 'HEPSI', 'TRY', 'USD']
+prefilter (>= 20,000 mn TL or unmatched): 481 -> 117
+  THYAO: cap=417105.0 in_bist_tickers=True
+  ASELS: cap=1761300.0 in_bist_tickers=True
+  AKBNK: cap=373620.0 in_bist_tickers=False
+  AVTUR: cap=539.1 in_bist_tickers=True
+  TUPRS: cap=771199.9 in_bist_tickers=True
+10 smallest matched (in bist_tickers.txt): [('DIRIT', 285.2), ('CASA', 333.4), ('MEGAP', 470.3), ('AKYHO', 526.2), ('ULAS', 531.5), ('AVTUR', 539.1), ('IHYAY', 549.0), ('EKIZ', 558.5), ('MZHLD', 581.9), ('SAMAT', 603.6)]
