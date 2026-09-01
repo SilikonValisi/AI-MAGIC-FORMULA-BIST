@@ -30,6 +30,11 @@ jobs:
       - name: Run daily pipeline
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Actions pipes step output (not a TTY), so Python fully
+          # block-buffers stdout by default — without this, run_daily.py's
+          # own print()s (including the ones forwarding the fetch script's
+          # progress) would sit in a buffer instead of showing up live here.
+          PYTHONUNBUFFERED: "1"
         run: python3 run_daily.py
 
       - name: Upload today's log
