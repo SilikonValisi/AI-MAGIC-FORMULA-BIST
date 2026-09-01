@@ -101,11 +101,25 @@ def request_with_retry(url: str) -> requests.Response | None:
 # ── Midas API ──────────────────────────────────────────────────────────────────
 
 def is_empty_midas(data: dict | None) -> bool:
-    """True when Midas returned no line items at all for any section."""
+    """
+    True when Midas returned nothing for the primary requested period (date1
+    / period index 0) in any section — the signal that this ticker doesn't
+    file under the requested consolidation flag (consolidated vs. solo) and
+    the caller should retry with the other one.
+
+    Checking only index 0 (not "every requested date slot", the original
+    check) matters because a ticker that files solo-only can still have a
+    leftover non-empty slot elsewhere in the same response — e.g. AVTUR
+    returned real consolidated data for one of the three distinct dates
+    requested but nothing for the current period (date1) itself, so the old
+    "all slots empty" check saw a non-empty slot and never fell back to solo,
+    leaving the actually-needed period silently empty (mis-logged as "missing
+    EBIT data" further downstream, rather than as a consolidation mismatch).
+    """
     if not data:
         return True
     return any(
-        isinstance(section, list) and all(not period for period in section)
+        isinstance(section, list) and (not section or not section[0])
         for section in data.values()
     )
 
