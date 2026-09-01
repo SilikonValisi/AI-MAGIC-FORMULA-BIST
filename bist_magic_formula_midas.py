@@ -58,8 +58,8 @@ PREFILTER_MARKET_CAP_FLOOR_MN_TL = 20_000
 # (connect, read). A tight connect timeout fails fast on an unreachable host;
 # the longer read timeout still allows for a slow response body.
 REQUEST_TIMEOUT = (5, 15)
-MAX_RETRIES     = 3   # total attempts, not extra attempts
-RETRY_BACKOFF_S = 2   # doubles each retry: 2s, 4s, 8s...
+MAX_RETRIES     = 5   # total attempts, not extra attempts
+RETRY_BACKOFF_S = 2   # doubles each retry: 2s, 4s, 8s, 16s...
 
 # Midas line-item labels, keyed by the section they live in.
 BALANCE_SHEET  = "bilanco"
