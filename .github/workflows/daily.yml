@@ -1,14 +1,13 @@
-name: Daily Magic Formula run
+name: Magic Formula run (Mon & Fri)
 
-# 15:30 UTC = 18:30 Istanbul time (BIST closes 18:00, TR has no DST), on
-# weekdays only — no reason to re-fetch on a day the exchange didn't trade.
-# GitHub schedules run in UTC regardless of where the repo/runner physically
-# is, which is also why this replaced the local launchd job in the first
-# place: isyatirim.com.tr was geo-blocked from the maintainer's actual
-# location, but is reachable from GitHub-hosted runners.
+# 15:30 UTC = 18:30 Istanbul time (BIST closes 18:00, TR has no DST), Monday
+# and Friday only. GitHub schedules run in UTC regardless of where the repo/
+# runner physically is, which is also why this replaced the local launchd
+# job in the first place: isyatirim.com.tr was geo-blocked from the
+# maintainer's actual location, but is reachable from GitHub-hosted runners.
 on:
   schedule:
-    - cron: "30 15 * * 1-5"
+    - cron: "30 15 * * 1,5"
   workflow_dispatch: {}
 
 permissions:
