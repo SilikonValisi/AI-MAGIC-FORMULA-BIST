@@ -56,6 +56,21 @@ print(f"\nAfter filters: {len(df)} stocks")
 df["EY_Rank"]    = df["EarningsYield"].rank(ascending=False, method="min")
 df["RoC_Rank"]   = df["RoC"].rank(ascending=False, method="min")
 df["Magic_Score"] = df["EY_Rank"] + df["RoC_Rank"]
+
+# Rank is global, across every reporting-quarter cohort at once — comparable
+# in a stable economy where "any trailing 12 months" is a fair stand-in for
+# "any other trailing 12 months", but under Turkey's inflation that's shakier:
+# a March reporter's TTM window and a June reporter's TTM window can reflect
+# genuinely different real-economy conditions, not just a calendar offset.
+# GroupRank/Group_Magic_Score re-rank within the same quarter cohort only
+# (Group column), so a stock's standing against companies measured over the
+# *same* months is visible too — informational, alongside Rank, not a
+# replacement for it.
+df["Group_EY_Rank"]    = df.groupby("Group")["EarningsYield"].rank(ascending=False, method="min")
+df["Group_RoC_Rank"]   = df.groupby("Group")["RoC"].rank(ascending=False, method="min")
+df["Group_Magic_Score"] = df["Group_EY_Rank"] + df["Group_RoC_Rank"]
+df["GroupRank"] = df.groupby("Group")["Group_Magic_Score"].rank(method="min").astype(int)
+
 df = df.sort_values("Magic_Score").reset_index(drop=True)
 df.index += 1
 #df = df.head(25)  # ← add this line
@@ -108,7 +123,7 @@ df.to_csv(filename, index=True, index_label="Rank")
 
 print(f"\nSaved → {filename}")
 print(f"\nTop 30:")
-display_cols = ["Ticker", "Name", "Period", "Group", "EarningsYield", "RoC", "FinansmanGideri_EBIT_%", "DebtShareOfCapital_%", "FreeFloat_%", "EY_Rank", "RoC_Rank", "Magic_Score"]
+display_cols = ["Ticker", "Name", "Period", "Group", "EarningsYield", "RoC", "FinansmanGideri_EBIT_%", "DebtShareOfCapital_%", "FreeFloat_%", "EY_Rank", "RoC_Rank", "Magic_Score", "GroupRank"]
 if "EBIT_Estimated" in df.columns:
     display_cols.append("EBIT_Estimated")
 print(df[display_cols].head(30).to_string())

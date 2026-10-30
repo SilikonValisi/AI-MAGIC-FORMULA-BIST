@@ -738,6 +738,7 @@
           finRatio: idx["FinansmanGideri_EBIT_%"] !== undefined ? num(r[idx["FinansmanGideri_EBIT_%"]]) : null,
           debtShare: idx["DebtShareOfCapital_%"] !== undefined ? num(r[idx["DebtShareOfCapital_%"]]) : null,
           volume: idx["Volume_mnUSD"] !== undefined ? num(r[idx["Volume_mnUSD"]]) : null,
+          groupRank: idx["GroupRank"] !== undefined ? num(r[idx["GroupRank"]]) : null,
         };
       })
       .filter(d => d.ey !== null && d.roc !== null);
@@ -946,6 +947,9 @@
 
       const eyBadge = d.eyRank !== null ? `<span class="rank-badge">#${d.eyRank}</span>` : "";
       const rocBadge = d.rocRank !== null ? `<span class="rank-badge">#${d.rocRank}</span>` : "";
+      const groupBadge = d.groupRank !== null
+        ? `<span class="rank-badge" title="Rank #${d.groupRank} among stocks reporting the same ${d.group || "period"} cohort — Rank above is global across all cohorts, which mixes different trailing-12-month windows">G#${d.groupRank}</span>`
+        : "";
 
       tr.innerHTML = `
         <td class="col-rank">${d.rank}</td>
@@ -953,7 +957,7 @@
           <span class="ticker">${d.ticker}</span>
           <span class="company">${d.name}</span>
         </td>
-        <td class="col-period">${d.period}</td>
+        <td class="col-period">${d.period}${groupBadge}</td>
         <td class="num-cell ${eyClass}">${fmtPct(d.ey)}${eyBadge}</td>
         <td class="num-cell ${rocClass}">${fmtPct(d.roc)}${rocBadge}</td>
         <td>${finCell}</td>
