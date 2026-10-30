@@ -51,7 +51,7 @@ MIDAS_API_URL            = "https://www.getmidas.com/wp-json/midas-api/v1/midas_
 # real 25,000 mn TL floor. Kept well below that real threshold as a safety
 # margin because this number comes from isyatirim's bulk comparison table,
 # while the actual market cap that ends up in the CSV and gets filtered on
-# later still comes from fetch_market_cap() (Midas) — a different source
+# later still comes from fetch_market_data() (Midas) — a different source
 # that can disagree slightly with isyatirim near the boundary.
 PREFILTER_MARKET_CAP_FLOOR_MN_TL = 20_000
 
@@ -79,7 +79,7 @@ MAX_WORKERS       = 5    # Concurrent threads
 RAW_COLUMNS = [
     "Ticker", "Name", "Period", "Group", "EBIT_TTM", "EBIT_Estimated",
     "EnterpriseValue", "EarningsYield", "RoC", "MarketCap_mnTL",
-    "NetDebt_mnTL", "FinansmanGideri", "Volume_mnUSD",
+    "NetDebt_mnTL", "FinansmanGideri", "Volume_mnUSD", "FreeFloat_%",
 ]
 
 
@@ -326,15 +326,23 @@ def fetch_financials(ticker: str, year: int, month: int, cached_ttm: tuple | Non
     }
 
 
-def fetch_market_cap(ticker: str) -> float | None:
-    """Market cap in millions of TL, scraped from the Midas quote page."""
+def fetch_market_data(ticker: str) -> tuple[float | None, float | None]:
+    """
+    Market cap (mn TL) and free-float ratio (%), both scraped off the same
+    Midas quote page fetch. Market cap here is price × *total* shares
+    outstanding, not float-adjusted — free float is reported separately so
+    callers can see how much of that market cap's price was actually set by
+    freely traded shares, versus extrapolated from them.
+    """
     resp = request_with_retry(MIDAS_QUOTE_URL.format(ticker=ticker.lower()))
     if resp is None:
-        return None
+        return None, None
 
     text = BeautifulSoup(resp.text, "lxml").get_text()
-    value = parse_turkish_number(extract_after_keyword(text, "Piyasa Değeri", 50))
-    return value / 1_000_000 if value is not None else None
+    market_cap = parse_turkish_number(extract_after_keyword(text, "Piyasa Değeri", 50))
+    free_float = parse_turkish_number(extract_after_keyword(text, "Halka Açıklık Oranı (%)", 30))
+
+    return (market_cap / 1_000_000 if market_cap is not None else None), free_float
 
 
 def fetch_market_cap_lookup() -> dict[str, float]:
@@ -459,7 +467,7 @@ def build_row(ticker: str, name: str, year: int, month: int,
     """
     year, month, cached_ttm = resolve_latest_period(ticker, year, month)
 
-    market_cap = fetch_market_cap(ticker)
+    market_cap, free_float = fetch_market_data(ticker)
 
     ev = None
     if market_cap:
@@ -478,6 +486,7 @@ def build_row(ticker: str, name: str, year: int, month: int,
         "MarketCap_mnTL":  market_cap,
         "NetDebt_mnTL":    net_debt,
         "Volume_mnUSD":    volume,
+        "FreeFloat_%":     free_float,
         **financials,
     }
 

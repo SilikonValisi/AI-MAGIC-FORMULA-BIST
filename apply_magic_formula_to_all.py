@@ -108,7 +108,7 @@ df.to_csv(filename, index=True, index_label="Rank")
 
 print(f"\nSaved → {filename}")
 print(f"\nTop 30:")
-display_cols = ["Ticker", "Name", "Period", "Group", "EarningsYield", "RoC", "FinansmanGideri_EBIT_%", "DebtShareOfCapital_%", "EY_Rank", "RoC_Rank", "Magic_Score"]
+display_cols = ["Ticker", "Name", "Period", "Group", "EarningsYield", "RoC", "FinansmanGideri_EBIT_%", "DebtShareOfCapital_%", "FreeFloat_%", "EY_Rank", "RoC_Rank", "Magic_Score"]
 if "EBIT_Estimated" in df.columns:
     display_cols.append("EBIT_Estimated")
 print(df[display_cols].head(30).to_string())
