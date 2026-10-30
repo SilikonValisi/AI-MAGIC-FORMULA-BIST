@@ -1,13 +1,10 @@
-name: Magic Formula run (Mon & Fri)
+name: Magic Formula run (manual)
 
-# 15:30 UTC = 18:30 Istanbul time (BIST closes 18:00, TR has no DST), Monday
-# and Friday only. GitHub schedules run in UTC regardless of where the repo/
-# runner physically is, which is also why this replaced the local launchd
-# job in the first place: isyatirim.com.tr was geo-blocked from the
-# maintainer's actual location, but is reachable from GitHub-hosted runners.
+# Manual-trigger only, no cron schedule — run from the Actions tab whenever
+# wanted (e.g. once a year) rather than on a fixed cadence. Still runs on a
+# GitHub-hosted runner rather than locally via launchd: isyatirim.com.tr was
+# geo-blocked from the maintainer's actual location, but is reachable here.
 on:
-  schedule:
-    - cron: "30 15 * * 1,5"
   workflow_dispatch: {}
 
 permissions:
