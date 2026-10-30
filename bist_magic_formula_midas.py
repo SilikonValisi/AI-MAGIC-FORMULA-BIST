@@ -227,13 +227,17 @@ def ttm_from_ytd(data: dict | None, section: str, line: str, month: int) -> tupl
     return current + prior_full - prior_ytd, False
 
 
-def fetch_ttm_ebit(ticker: str, year: int, month: int) -> tuple[float | None, bool, dict | None]:
+def fetch_ttm_ebit(ticker: str, year: int, month: int, warn: bool = True) -> tuple[float | None, bool, dict | None]:
     """
     TTM EBIT from Midas's income statement (see `ttm_from_ytd`).
 
     Returns (ebit, is_estimated, income_data). `income_data` is handed back so
     the caller can convert other income-statement lines (financing expense)
     from the same response instead of paying for another request.
+
+    `warn=False` silences the missing-data log line for speculative lookups
+    (see `resolve_latest_period`), where a miss just means "not filed yet" —
+    not something worth surfacing to the user.
     """
     if month == 12:
         data = fetch_midas(ticker, [(year, 12)], INCOME_STMT)
@@ -243,15 +247,54 @@ def fetch_ttm_ebit(ticker: str, year: int, month: int) -> tuple[float | None, bo
 
     ebit, is_estimated = ttm_from_ytd(data, INCOME_STMT, EBIT_LINE, month)
 
-    if ebit is None:
+    if ebit is None and warn:
         print(f"[WARN] {ticker}: missing EBIT data for {year}/{month}")
 
     return ebit, is_estimated, data
 
 
-def fetch_financials(ticker: str, year: int, month: int) -> dict:
+QUARTER_END_DAY = {3: 31, 6: 30, 9: 30, 12: 31}
+
+
+def next_quarter(year: int, month: int) -> tuple[int, int]:
+    """The quarter after (year, month), e.g. (2026, 9) -> (2026, 12)."""
+    return (year + 1, 3) if month == 12 else (year, month + 3)
+
+
+def resolve_latest_period(ticker: str, year: int, month: int) -> tuple[int, int, tuple | None]:
+    """
+    Starting from isyatirim's detected period, probe Midas directly for any
+    later quarter(s) that have already ended but aren't reflected in
+    isyatirim's page text yet.
+
+    isyatirim's "sirket-karti" page and Midas's filing data update on their
+    own schedules, and in practice isyatirim can lag — a company can already
+    have real EBIT posted on Midas for the newest closed quarter while
+    isyatirim's page text still only mentions the previous one. Walking
+    forward here (instead of trusting isyatirim as the ceiling) means that
+    gap no longer silently holds a stock back a full quarter.
+
+    Returns (year, month, cached_ttm) where cached_ttm is the
+    (ebit, is_estimated, income_data) tuple already fetched for the returned
+    period, so the caller doesn't pay for the same Midas request twice — or
+    None if the isyatirim-detected period is what we're sticking with.
+    """
+    cached = None
+    while True:
+        ny, nm = next_quarter(year, month)
+        if datetime(ny, nm, QUARTER_END_DAY[nm]) > datetime.now():
+            return year, month, cached  # that quarter hasn't even closed yet
+
+        result = fetch_ttm_ebit(ticker, ny, nm, warn=False)
+        if result[0] is None:
+            return year, month, cached  # not filed on Midas yet either
+
+        year, month, cached = ny, nm, result
+
+
+def fetch_financials(ticker: str, year: int, month: int, cached_ttm: tuple | None = None) -> dict:
     """TTM EBIT, Return on Capital, and financing expense for one period."""
-    ebit, is_estimated, income_data = fetch_ttm_ebit(ticker, year, month)
+    ebit, is_estimated, income_data = cached_ttm if cached_ttm else fetch_ttm_ebit(ticker, year, month)
     balance = fetch_midas(ticker, [(year, month)], BALANCE_SHEET)
 
     current_assets = midas_value(balance, BALANCE_SHEET, CURR_ASSETS_LINE)
@@ -408,14 +451,21 @@ def build_row(ticker: str, name: str, year: int, month: int,
     Assemble one screener row from Midas data plus the four isyatirim-sourced
     fields, whichever way the caller obtained them (live scrape or a stored
     CSV row). Market cap and net debt are both in millions of TL.
+
+    `year`/`month` are isyatirim's detected period, but the actual financials
+    are pulled for whatever period `resolve_latest_period` settles on — which
+    can be a quarter or more ahead if Midas already has it filed (see that
+    function's docstring).
     """
+    year, month, cached_ttm = resolve_latest_period(ticker, year, month)
+
     market_cap = fetch_market_cap(ticker)
 
     ev = None
     if market_cap:
         ev = (market_cap + (net_debt or 0)) * 1_000_000
 
-    financials = fetch_financials(ticker, year, month)
+    financials = fetch_financials(ticker, year, month, cached_ttm)
     ebit = financials["EBIT_TTM"]
 
     return {
